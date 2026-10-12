@@ -84,15 +84,21 @@ class EpisodeLoader {
          * @param source the online source of the episode.
          */
         private suspend fun getHostersOnHttp(episode: Episode, source: AnimeHttpSource): List<Hoster> {
-            // TODO(1.6): Remove else block when dropping support for ext lib <1.6
-            return if (checkHasHosters(source)) {
-                source.getHosterList(episode.toSEpisode())
+            val sourceEpisode = episode.toSEpisode()
+
+            if (checkHasHosters(source)) {
+                val hosters = source.getHosterList(sourceEpisode)
                     .let { source.run { it.sortHosters() } }
-            } else {
-                source.getVideoList(episode.toSEpisode())
-                    .let { source.run { it.sortVideos() } }
-                    .toHosterList()
+
+                // Some extensions expose the newer hoster API but return no hosters,
+                // while their legacy episode-level parser can still provide playable videos.
+                if (hosters.isNotEmpty()) return hosters
             }
+
+            // Keep compatibility with older extensions and fall back when the newer API is empty.
+            return source.getVideoList(sourceEpisode)
+                .let { source.run { it.sortVideos() } }
+                .toHosterList()
         }
 
         /**
